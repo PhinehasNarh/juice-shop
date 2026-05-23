@@ -164,14 +164,17 @@ jobs:
           done
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: http://localhost:3000
-          rules_file_name: .zap/rules.tsv
-          cmd_options: -a -j
-          fail_action: false
-          allow_issue_writing: false
-          artifact_name: zap-report
+        run: |
+          docker run --network=host \
+            -v ${{ github.workspace }}:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:3000 \
+            -r zap-report.html \
+            -J zap-report.json \
+            -w zap-report.md \
+            -c /zap/wrk/.zap/rules.tsv \
+            -a -j || true
 
   # ──────────────────────────────────────────────
   # JOB 4: Pipeline Summary
