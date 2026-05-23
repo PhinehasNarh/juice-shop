@@ -171,16 +171,7 @@ jobs:
           cmd_options: -a -j
           fail_action: false
           allow_issue_writing: false
-
-      - name: Upload ZAP report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: zap-report
-          path: |
-            report_html.html
-            report_json.json
-            report_md.md
+          artifact_name: zap-report
 
   # ──────────────────────────────────────────────
   # JOB 4: Pipeline Summary
