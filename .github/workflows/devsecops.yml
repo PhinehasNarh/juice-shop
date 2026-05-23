@@ -170,9 +170,9 @@ jobs:
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:3000 \
-            -r zap-report.html \
-            -J zap-report.json \
-            -w zap-report.md \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -w /zap/wrk/zap-report.md \
             -c /zap/wrk/.zap/rules.tsv \
             -a -j || true
 
