@@ -176,6 +176,14 @@ jobs:
             -c /zap/wrk/.zap/rules.tsv \
             -a -j || true
 
+      - name: List ZAP output files
+        if: always()
+        run: |
+          echo "=== Workspace root ==="
+          ls -la ${{ github.workspace }}/
+          echo "=== ZAP files ==="
+          find ${{ github.workspace }} -name "zap-report*" -o -name "report_*" 2>/dev/null || echo "none found"
+
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         if: always()
