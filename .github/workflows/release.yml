@@ -50,6 +50,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   docker:
+    if: github.repository == 'juice-shop/juice-shop'
     runs-on: ubuntu-latest
     steps:
       - name: "Check out Git repository"
@@ -84,7 +85,7 @@ jobs:
             BUILD_DATE=${{ env.BUILD_DATE }}
             CYCLONEDX_NPM_VERSION=${{ env.CYCLONEDX_NPM_VERSION }}
   notify-slack:
-    if: always()
+    if: always() && github.repository == 'juice-shop/juice-shop'
     needs:
       - package
       - docker

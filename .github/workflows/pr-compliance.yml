@@ -67,6 +67,29 @@ jobs:
         with:
           script: |
             const author = process.env.AUTHOR;
+
+            // Trusted #1: owner of the repository the PR was opened against.
+            if (author === context.repo.owner) {
+              console.log(`${author} owns this repository, skipping checks.`);
+              core.setOutput('is_member', 'true');
+              return;
+            }
+
+            // Trusted #2: anyone with push access to this repository.
+            try {
+              await github.rest.repos.checkCollaborator({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: author
+              });
+              console.log(`${author} is a collaborator on this repository, skipping checks.`);
+              core.setOutput('is_member', 'true');
+              return;
+            } catch (e) {
+              console.log(`${author} is not a collaborator on this repository.`);
+            }
+
+            // Trusted #3: public member of the upstream juice-shop org.
             try {
               await github.rest.orgs.checkPublicMembershipForUser({
                 org: 'juice-shop',
@@ -88,7 +111,9 @@ jobs:
         with:
           script: |
             const pr = JSON.parse(process.env.PR_JSON);
-            const wrongBranch = pr.base.ref === 'master';
+            // Contributions must target the repository default branch ('develop' upstream).
+            const defaultBranch = context.payload.repository.default_branch;
+            const wrongBranch = pr.base.ref !== defaultBranch;
             core.setOutput('violation', wrongBranch ? 'true' : 'false');
             console.log(`Target branch check: ${wrongBranch ? '❌ FAILED' : '✅ PASSED'}`);
         env:
@@ -305,6 +330,7 @@ jobs:
           script: |
             const pr = JSON.parse(process.env.PR_JSON);
             const author = process.env.AUTHOR;
+            const defaultBranch = context.payload.repository.default_branch;
             const wrongBranch = process.env.BRANCH_VIOLATION === 'true';
             const aiMissing = process.env.AI_VIOLATION === 'true';
             const affirmationMissing = process.env.AFFIRMATION_VIOLATION === 'true';
@@ -335,9 +361,9 @@ jobs:
             }
             if (wrongBranch) {
               violations.push(
-                '🎯 **Wrong target branch:** This PR targets the `master` branch. ' +
+                '🎯 **Wrong target branch:** This PR targets the `' + pr.base.ref + '` branch. ' +
                 'Per our [contributing guidelines](https://github.com/juice-shop/juice-shop/blob/develop/CONTRIBUTING.md), ' +
-                'all PRs must be based on the `develop` branch. Please re-open this PR against `develop`.'
+                'all PRs must be based on the `' + defaultBranch + '` branch. Please re-open this PR against `' + defaultBranch + '`.'
               );
             }
             if (aiMissing) {
