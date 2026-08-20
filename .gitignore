@@ -67,3 +67,6 @@ config/*.yml
 
 # System Files
 .DS_Store
+
+# ZAP baseline scan output (generated in CI)
+zap-out/

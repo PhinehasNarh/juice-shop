@@ -39,18 +39,61 @@ jobs:
           docker logs juice-shop
           exit 1
 
+      - name: Prepare ZAP working directory
+        run: |
+          # ZAP resolves report paths relative to /zap/wrk, so mount a dedicated
+          # directory and pass bare filenames. It must be world-writable because
+          # the container runs as uid 1000 while the workspace is owned by 1001.
+          mkdir -p zap-out
+          cp .zap/rules.tsv zap-out/rules.tsv
+          chmod -R 777 zap-out
+
       - name: ZAP Baseline Scan
         run: |
+          set +e
           docker run --network=host \
-            -v ${{ github.workspace }}:/zap/wrk:rw \
+            -v ${{ github.workspace }}/zap-out:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:3000 \
-            -r /zap/wrk/zap-report.html \
-            -J /zap/wrk/zap-report.json \
-            -w /zap/wrk/zap-report.md \
-            -c /zap/wrk/.zap/rules.tsv \
-            -a -j || true
+            -r zap-report.html \
+            -J zap-report.json \
+            -w zap-report.md \
+            -c rules.tsv \
+            -a -j 2>&1 | tee zap-out/zap-console.log
+          zap_exit=${PIPESTATUS[0]}
+          set -e
+          echo "ZAP exit code: $zap_exit"
+          # 0 = clean, 1 = a FAIL rule triggered, 2 = warnings only, 3 = ZAP itself failed.
+          # Only a genuine ZAP failure breaks the job; findings are reported instead.
+          if [ "$zap_exit" -eq 3 ]; then
+            echo "ZAP terminated with an internal error"
+            exit 1
+          fi
+
+      - name: Summarize ZAP results
+        if: always()
+        run: |
+          {
+            echo "### ZAP Baseline Scan"
+            echo ""
+            totals=$(grep -oE '(FAIL-NEW|FAIL-INPROG|WARN-NEW|WARN-INPROG|INFO|IGNORE|PASS): [0-9]+' \
+              zap-out/zap-console.log 2>/dev/null | tail -7)
+            if [ -n "$totals" ]; then
+              echo "| Result | Count |"
+              echo "|--------|-------|"
+              echo "$totals" | sed 's/^\(.*\): \(.*\)$/| \1 | \2 |/'
+            else
+              echo "No ZAP totals found. Check the scan step log."
+            fi
+            echo ""
+            if [ -f zap-out/zap-report.html ]; then
+              echo "Full HTML, JSON and Markdown reports are attached as workflow artifacts."
+            else
+              echo "**No report file was written.** Check the scan step log."
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+          ls -la zap-out/
 
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
@@ -58,10 +101,11 @@ jobs:
         with:
           name: zap-baseline-report
           path: |
-            zap-report.html
-            zap-report.json
-            zap-report.md
-          if-no-files-found: warn
+            zap-out/zap-report.html
+            zap-out/zap-report.json
+            zap-out/zap-report.md
+            zap-out/zap-console.log
+          if-no-files-found: error
 
       - name: Stop Juice Shop container
         if: always()
